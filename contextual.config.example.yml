@@ -1,0 +1,31 @@
+# contextual configuration file
+#
+# Copy this file to ~/.contextual/config.yml and fill in your values.
+#
+#   mkdir -p ~/.contextual
+#   cp contextual.config.example.yml ~/.contextual/config.yml
+
+# planner: the command contextual will run to generate a plan file.
+#
+# The <promptFile> placeholder is required — contextual substitutes it with
+# the path to a temporary file containing the full prompt text.
+#
+# The recommended pattern is an inline prompt string that references the
+# prompt file using backtick syntax, which is understood by most AI CLIs:
+#
+#   planner: copilot -p "read and perform the actions in the following file: <promptFile>" --allow-all-tools --allow-all-paths --autopilot -s
+#   planner: claude -p "read and perform the actions in the following file: <promptFile>"
+#   planner: gemini -p "read and perform the actions in the following file: <promptFile>"
+#   planner: opencode run "read and perform the actions in the following file: <promptFile>"
+planner: "copilot -p \"read and perform the actions in the following file: <promptFile>\" --allow-all-t    ools --allow-all-paths --autopilot -s"
+
+# atlassian: credentials for fetching Jira issues and Confluence pages.
+#
+# host:      your Atlassian Cloud hostname, e.g. your-org.atlassian.net
+# api_user:  the email address associated with your Atlassian account
+# api_token: an Atlassian API token — generate one at:
+#            https://id.atlassian.com/manage-profile/security/api-tokens
+atlassian:
+  host: your-org.atlassian.net
+  api_user: you@example.com
+  api_token: your-api-token-here
