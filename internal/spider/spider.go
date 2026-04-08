@@ -45,7 +45,7 @@ func (s *Spider) ParseItem(arg string) (*types.Item, error) {
 		host = s.Config.Atlassian.Host
 	}
 
-	// 1. Jira issue key: e.g. IPM-1234
+	// 1. Jira issue key: e.g. CTX-1234
 	if jiraKeyRe.MatchString(arg) {
 		u := ""
 		if host != "" {

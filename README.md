@@ -33,11 +33,11 @@ Usage: contextual <item> [<item> ...]
 `contextual` classifies each CLI argument into an item type (see `internal/spider/spider.go`):
 
 1. **Jira issue key** (uppercase project key + hyphen + digits)
-   - Example: `IPM-1234`
+   - Example: `CTX-1234`
 2. **Confluence page ID** (8+ digits)
    - Example: `12345678`
 3. **Atlassian Jira URL** (must include your configured host and `/browse/<KEY>`)
-   - Example: `https://your-company.atlassian.net/browse/IPM-1234`
+   - Example: `https://your-company.atlassian.net/browse/CTX-1234`
 4. **Atlassian Confluence URL** (must include your configured host and `/wiki/` and contain a numeric page ID)
    - Example: `https://your-company.atlassian.net/wiki/spaces/ABC/pages/12345678/...`
 5. **Generic web URL**
@@ -90,7 +90,7 @@ Notes:
 Fetch a Jira issue and its related context (parents/subtasks + referenced Confluence/web links):
 
 ```bash
-./bin/contextual IPM-1234
+./bin/contextual CTX-1234
 ```
 
 Fetch a Confluence page and its expanded context (child pages + any Jira keys/web links found in it):

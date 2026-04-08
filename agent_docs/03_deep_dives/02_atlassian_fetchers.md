@@ -15,7 +15,7 @@ Provided by `internal/spider` (which reads them from `cfg.Atlassian.*`):
 - `host` — from `cfg.Atlassian.Host`
 - `email` — from `cfg.Atlassian.APIUser`
 - `token` — from `cfg.Atlassian.APIToken`
-- `id` — Jira key (e.g. `IPM-1234`) or Confluence numeric page ID
+- `id` — Jira key (e.g. `CTX-1234`) or Confluence numeric page ID
 
 **No environment variables are involved.** All credentials come from `~/.contextual/config.yml`.
 

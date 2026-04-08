@@ -23,7 +23,7 @@ The logger is constructed in `cmd/contextual/main.go` and passed down to `spider
 Regardless of mode, **all log entries are always written** to `~/.contextual/log.log` with ISO 8601 UTC timestamps:
 
 ```
-2026-04-04T22:07:39Z [INFO] Fetching jira: IPM-1234
+2026-04-04T22:07:39Z [INFO] Fetching jira: CTX-1234
 2026-04-04T22:07:40Z [ERROR] Planner exited with code 1: copilot -p ...
 ```
 

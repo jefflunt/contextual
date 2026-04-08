@@ -16,17 +16,17 @@ func newTestSpider(host string) *Spider {
 
 func TestParseItemJiraKey(t *testing.T) {
 	s := newTestSpider("example.atlassian.net")
-	item, err := s.ParseItem("IPM-1234")
+	item, err := s.ParseItem("CTX-1234")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if item.Type != types.ItemTypeJira {
 		t.Errorf("expected jira, got %s", item.Type)
 	}
-	if item.ID != "IPM-1234" {
-		t.Errorf("expected IPM-1234, got %s", item.ID)
+	if item.ID != "CTX-1234" {
+		t.Errorf("expected CTX-1234, got %s", item.ID)
 	}
-	if !strings.Contains(item.URL, "browse/IPM-1234") {
+	if !strings.Contains(item.URL, "browse/CTX-1234") {
 		t.Errorf("expected browse URL, got %s", item.URL)
 	}
 }

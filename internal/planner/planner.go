@@ -89,7 +89,7 @@ func PromptYesNo(question string) bool {
 func ItemSlug(item types.Item) string {
 	switch item.Type {
 	case types.ItemTypeJira:
-		return item.ID // already safe, e.g. IPM-1234
+		return item.ID // already safe, e.g. CTX-1234
 	case types.ItemTypeConfluence:
 		if item.Title != "" {
 			return slugify(item.Title)
