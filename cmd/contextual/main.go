@@ -14,6 +14,7 @@ import (
 	"github.com/jluntpcty/contextual/internal/prompt"
 	"github.com/jluntpcty/contextual/internal/spider"
 	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jluntpcty/contextual/pkg/version"
 )
 
 func main() {
@@ -22,6 +23,12 @@ func main() {
 	log.SetFlags(0)
 
 	args := os.Args[1:]
+
+	// Detect 'version' subcommand.
+	if len(args) > 0 && args[0] == "version" {
+		fmt.Println(version.Version)
+		os.Exit(0)
+	}
 
 	// Detect 'plan' subcommand.
 	planMode := false
