@@ -105,7 +105,7 @@ print plan.md path to stdout
 - `New(cfg *config.Config, log *logger.Logger) *Spider`
 - `ParseItem(arg string) (*types.Item, error)`
 - `Run(args []string) ([]types.Item, error)`
-- Reads credentials from `cfg.Atlassian.{Host, APIUser, APIToken}` — **no env vars**.
+- Reads credentials from `cfg.Atlassian.{Host, APIUser, APIToken, MaxSpiderJumps}` — **no env vars**.
 
 ### `internal/fetcher`
 - Owns I/O for each source.
@@ -113,7 +113,7 @@ print plan.md path to stdout
 - Returns structured results (Item + extracted references for enqueueing).
 
 ### `internal/config`
-- `Config.Atlassian.{Host, APIUser, APIToken}` — Atlassian credentials.
+- `Config.Atlassian.{Host, APIUser, APIToken, MaxSpiderJumps}` — Atlassian credentials and spidering depth control.
 - `Config.Planner` — shell command template; must contain `<promptFile>` placeholder.
 - CLI tolerates config load failure (warn + continue with empty config).
 

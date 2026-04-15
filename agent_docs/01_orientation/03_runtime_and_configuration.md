@@ -37,6 +37,7 @@ atlassian:
   host: your-org.atlassian.net
   api_user: you@example.com
   api_token: your-api-token
+  max_spider_jumps: 5
 ```
 
 Go struct (`internal/config/config.go`):
@@ -48,9 +49,10 @@ type Config struct {
 }
 
 type AtlassianConfig struct {
-    Host     string `yaml:"host"`
-    APIUser  string `yaml:"api_user"`
-    APIToken string `yaml:"api_token"`
+    Host           string `yaml:"host"`
+    APIUser        string `yaml:"api_user"`
+    APIToken       string `yaml:"api_token"`
+    MaxSpiderJumps int    `yaml:"max_spider_jumps"`
 }
 ```
 
