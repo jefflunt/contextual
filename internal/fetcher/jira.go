@@ -5,44 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/jluntpcty/contextual/internal/types"
 )
-...
-	// If this is an Epic, fetch its child issues.
-	log.Printf("Checking if %s is an Epic. Type: %s", issueKey, issue.Fields.Issuetype.Name)
-	if issue.Fields.Issuetype.Name == "Epic" {
-		searchURL := fmt.Sprintf("https://%s/rest/api/3/search", host)
-		jql := fmt.Sprintf(`"Epic Link" = %s OR parent = %s`, issueKey, issueKey)
-		
-		// Body for search
-		jsonBody, _ := json.Marshal(map[string]string{"jql": jql})
-		
-		data, statusCode, err := doRequestWithBody(client, "POST", searchURL, email, token, jsonBody)
-		if err == nil && statusCode >= 200 && statusCode < 300 {
-			var searchResp struct {
-				Issues []struct {
-					Key string `json:"key"`
-				} `json:"issues"`
-			}
-			if json.Unmarshal(data, &searchResp) == nil {
-				log.Printf("Found %d issues for Epic %s", len(searchResp.Issues), issueKey)
-				for _, iss := range searchResp.Issues {
-					subtaskKeys = appendUnique(subtaskKeys, iss.Key)
-				}
-			} else {
-				log.Printf("Failed to unmarshal search response: %v", err)
-			}
-		} else {
-			log.Printf("Search request failed: status %d, err %v", statusCode, err)
-		}
-	}
 
-
+type JiraResult struct {
+	Item          types.Item
+	ParentKey     string
+	SubtaskKeys   []string
+	ConfluenceIDs []string
+	WebURLs       []string
+}
 
 func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 	client := newHTTPClient()
@@ -105,27 +81,26 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 	subtaskKeys := make([]string, 0, len(issue.Fields.Subtasks)+len(issue.Fields.Issuelinks))
 	for _, st := range issue.Fields.Subtasks {
 		if key, ok := st["key"].(string); ok {
-			subtaskKeys = append(subtaskKeys, key)
+			subtaskKeys = appendUnique(subtaskKeys, key)
 		}
 	}
 	for _, link := range issue.Fields.Issuelinks {
 		for _, key := range []string{"outwardIssue", "inwardIssue"} {
 			if val, ok := link[key].(map[string]interface{}); ok {
 				if issueKey, ok := val["key"].(string); ok {
-					subtaskKeys = append(subtaskKeys, issueKey)
+					subtaskKeys = appendUnique(subtaskKeys, issueKey)
 				}
 			}
 		}
 	}
 
 	// If this is an Epic, fetch its child issues.
-	s.logInfo("Checking if %s is an Epic. Type: %s", issueKey, issue.Fields.Issuetype.Name)
 	if issue.Fields.Issuetype.Name == "Epic" {
-		searchURL := fmt.Sprintf("https://%s/rest/api/3/search", host)
+		searchURL := fmt.Sprintf("https://%s/rest/api/3/search/jql", host)
 		jql := fmt.Sprintf(`"Epic Link" = %s OR parent = %s`, issueKey, issueKey)
 
 		// Body for search
-		jsonBody, _ := json.Marshal(map[string]string{"jql": jql})
+		jsonBody, _ := json.Marshal(map[string]interface{}{"jql": jql, "fields": []string{"key"}})
 
 		data, statusCode, err := doRequestWithBody(client, "POST", searchURL, email, token, jsonBody)
 		if err == nil && statusCode >= 200 && statusCode < 300 {
@@ -135,15 +110,10 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 				} `json:"issues"`
 			}
 			if json.Unmarshal(data, &searchResp) == nil {
-				s.logInfo("Found %d issues for Epic %s", len(searchResp.Issues), issueKey)
 				for _, iss := range searchResp.Issues {
 					subtaskKeys = appendUnique(subtaskKeys, iss.Key)
 				}
-			} else {
-				s.logError("Failed to unmarshal search response: %v", err)
 			}
-		} else {
-			s.logError("Search request failed: status %d, err %v", statusCode, err)
 		}
 	}
 
