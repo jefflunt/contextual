@@ -29,3 +29,4 @@ atlassian:
   host: your-org.atlassian.net
   api_user: you@example.com
   api_token: your-api-token-here
+  max_spider_jumps: 5

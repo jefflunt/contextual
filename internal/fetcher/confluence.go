@@ -38,8 +38,18 @@ func FetchConfluence(host, email, token, pageID string) (*ConfluenceResult, erro
 
 	storageXHTML := page.Body.Storage.Value
 	textContent := htmlToText(storageXHTML)
-	webURLs := extractHTMLLinks(storageXHTML, host)
+	allLinks := extractHTMLLinks(storageXHTML, host)
 	jiraKeys := extractJiraKeys(storageXHTML)
+
+	// Build webURLs with all links.
+	var webURLs []string
+	for _, u := range allLinks {
+		// Resolve relative links.
+		if strings.HasPrefix(u, "/") {
+			u = "https://" + host + u
+		}
+		webURLs = appendUnique(webURLs, u)
+	}
 
 	var sb strings.Builder
 	sb.WriteString(textContent)
@@ -376,14 +386,8 @@ func extractHTMLLinks(rawHTML, host string) []string {
 					if href == "" || seen[href] {
 						break
 					}
-					// Exclude Atlassian URLs.
-					if strings.Contains(href, host) {
-						break
-					}
-					if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
-						seen[href] = true
-						links = append(links, href)
-					}
+					seen[href] = true
+					links = append(links, href)
 					break
 				}
 			}

@@ -2,6 +2,7 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 .DS_Store
 contextual-*.txt
+context.md
 
 #
 # Binaries for programs and plugins

@@ -91,24 +91,34 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 	type queueEntry struct {
 		item           types.Item
 		fromConfluence bool // true when this Jira item was discovered via Confluence
+		jumps          int
 	}
 
 	var queue []queueEntry
-	visited := map[string]bool{} // key: "<type>:<id_or_url>"
+	visited := map[string]bool{} // key: "<type>:<canonical_url>"
 
 	key := func(item *types.Item) string {
 		id := item.ID
 		if id == "" {
 			id = item.URL
 		}
-		return string(item.Type) + ":" + id
+		// Canonicalize URL to prevent circular crawls on same resource.
+		canonicalURL := item.URL
+		// (Simple canonicalization: remove query params/fragment)
+		if idx := strings.Index(canonicalURL, "?"); idx != -1 {
+			canonicalURL = canonicalURL[:idx]
+		}
+		if idx := strings.Index(canonicalURL, "#"); idx != -1 {
+			canonicalURL = canonicalURL[:idx]
+		}
+		return string(item.Type) + ":" + canonicalURL
 	}
 
-	enqueue := func(item types.Item, fromConfluence bool) {
+	enqueue := func(item types.Item, fromConfluence bool, jumps int) {
 		k := key(&item)
 		if !visited[k] {
 			visited[k] = true
-			queue = append(queue, queueEntry{item, fromConfluence})
+			queue = append(queue, queueEntry{item, fromConfluence, jumps})
 		}
 	}
 
@@ -119,16 +129,20 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 			s.logError("%v", err)
 			continue
 		}
-		enqueue(*item, false)
+		enqueue(*item, false, 0)
 	}
 
 	host := ""
 	email := ""
 	token := ""
+	maxJumps := 5 // Default
 	if s.Config != nil {
 		host = s.Config.Atlassian.Host
 		email = s.Config.Atlassian.APIUser
 		token = s.Config.Atlassian.APIToken
+		if s.Config.Atlassian.MaxSpiderJumps > 0 {
+			maxJumps = s.Config.Atlassian.MaxSpiderJumps
+		}
 	}
 
 	var results []types.Item
@@ -139,9 +153,15 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 
 		item := entry.item
 
+		if entry.jumps >= maxJumps {
+			s.logInfo("Max spider jumps reached for %s, skipping expansion", item.URL)
+			results = append(results, item)
+			continue
+		}
+
 		switch item.Type {
 		case types.ItemTypeJira:
-			s.logInfo("Fetching jira: %s", item.ID)
+			s.logInfo("Fetching jira: %s (jumps: %d)", item.ID, entry.jumps)
 			if host == "" {
 				s.logError("atlassian.host not configured, cannot fetch Jira item %s — see contextual.config.example.yml", item.ID)
 				continue
@@ -155,18 +175,20 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 
 			// Always fetch parent and subtasks.
 			if result.ParentKey != "" {
+				s.logInfo("Enqueueing parent: %s", result.ParentKey)
 				enqueue(types.Item{
 					Type: types.ItemTypeJira,
 					ID:   result.ParentKey,
 					URL:  fmt.Sprintf("https://%s/browse/%s", host, result.ParentKey),
-				}, entry.fromConfluence)
+				}, entry.fromConfluence, entry.jumps+1)
 			}
-			for _, sk := range result.SubtaskKeys {
+			for _, st := range result.SubtaskKeys {
+				s.logInfo("Enqueueing subtask/linked: %s", st)
 				enqueue(types.Item{
 					Type: types.ItemTypeJira,
-					ID:   sk,
-					URL:  fmt.Sprintf("https://%s/browse/%s", host, sk),
-				}, entry.fromConfluence)
+					ID:   st,
+					URL:  fmt.Sprintf("https://%s/browse/%s", host, st),
+				}, entry.fromConfluence, entry.jumps+1)
 			}
 			// Confluence pages and web URLs found in Jira.
 			for _, cid := range result.ConfluenceIDs {
@@ -174,14 +196,14 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeConfluence,
 					ID:   cid,
 					URL:  fmt.Sprintf("https://%s/wiki/rest/api/content/%s", host, cid),
-				}, false)
+				}, false, entry.jumps+1)
 			}
 			for _, u := range result.WebURLs {
-				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false)
+				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false, entry.jumps+1)
 			}
 
 		case types.ItemTypeConfluence:
-			s.logInfo("Fetching confluence: %s", item.ID)
+			s.logInfo("Fetching confluence: %s (jumps: %d)", item.ID, entry.jumps)
 			if host == "" {
 				s.logError("atlassian.host not configured, cannot fetch Confluence item %s — see contextual.config.example.yml", item.ID)
 				continue
@@ -199,7 +221,7 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeConfluence,
 					ID:   cid,
 					URL:  fmt.Sprintf("https://%s/wiki/rest/api/content/%s", host, cid),
-				}, false)
+				}, false, entry.jumps+1)
 			}
 			// Jira keys found in Confluence (fetch with parent/child expansion).
 			for _, jk := range result.JiraKeys {
@@ -207,11 +229,11 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeJira,
 					ID:   jk,
 					URL:  fmt.Sprintf("https://%s/browse/%s", host, jk),
-				}, true)
+				}, true, entry.jumps+1)
 			}
 			// Web URLs directly linked from Confluence.
 			for _, u := range result.WebURLs {
-				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false)
+				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false, entry.jumps+1)
 			}
 
 		case types.ItemTypeWeb:

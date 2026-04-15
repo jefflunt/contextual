@@ -1,28 +1,53 @@
 package fetcher
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/jluntpcty/contextual/internal/types"
 )
+...
+	// If this is an Epic, fetch its child issues.
+	log.Printf("Checking if %s is an Epic. Type: %s", issueKey, issue.Fields.Issuetype.Name)
+	if issue.Fields.Issuetype.Name == "Epic" {
+		searchURL := fmt.Sprintf("https://%s/rest/api/3/search", host)
+		jql := fmt.Sprintf(`"Epic Link" = %s OR parent = %s`, issueKey, issueKey)
+		
+		// Body for search
+		jsonBody, _ := json.Marshal(map[string]string{"jql": jql})
+		
+		data, statusCode, err := doRequestWithBody(client, "POST", searchURL, email, token, jsonBody)
+		if err == nil && statusCode >= 200 && statusCode < 300 {
+			var searchResp struct {
+				Issues []struct {
+					Key string `json:"key"`
+				} `json:"issues"`
+			}
+			if json.Unmarshal(data, &searchResp) == nil {
+				log.Printf("Found %d issues for Epic %s", len(searchResp.Issues), issueKey)
+				for _, iss := range searchResp.Issues {
+					subtaskKeys = appendUnique(subtaskKeys, iss.Key)
+				}
+			} else {
+				log.Printf("Failed to unmarshal search response: %v", err)
+			}
+		} else {
+			log.Printf("Search request failed: status %d, err %v", statusCode, err)
+		}
+	}
 
-type JiraResult struct {
-	Item          types.Item
-	ParentKey     string
-	SubtaskKeys   []string
-	ConfluenceIDs []string
-	WebURLs       []string
-}
+
 
 func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 	client := newHTTPClient()
 
-	issueURL := fmt.Sprintf("https://%s/rest/api/3/issue/%s", host, issueKey)
+	issueURL := fmt.Sprintf("https://%s/rest/api/3/issue/%s?expand=fields", host, issueKey)
 	issueData, statusCode, err := doRequest(client, "GET", issueURL, email, token)
 	if err != nil {
 		return nil, err
@@ -38,7 +63,7 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 
 	// Extract description text and links from ADF.
 	descText := extractTextFromADF(issue.Fields.Description)
-	confluenceIDs, webURLs := extractLinksFromADF(issue.Fields.Description, host)
+	allLinks := extractLinksFromADF(issue.Fields.Description, host)
 
 	// Build comments section.
 	var sb strings.Builder
@@ -53,9 +78,7 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 			author := c.Author.DisplayName
 			commentText := extractTextFromADF(c.Body)
 			sb.WriteString(fmt.Sprintf("**%s**: %s\n\n", author, commentText))
-			cIDs, cURLs := extractLinksFromADF(c.Body, host)
-			confluenceIDs = appendUnique(confluenceIDs, cIDs...)
-			webURLs = appendUnique(webURLs, cURLs...)
+			allLinks = appendUnique(allLinks, extractLinksFromADF(c.Body, host)...)
 		}
 	}
 
@@ -67,17 +90,8 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 		if json.Unmarshal(remoteData, &remoteLinks) == nil {
 			for _, rl := range remoteLinks {
 				u := rl.Object.URL
-				if u == "" {
-					continue
-				}
-				if isConfluenceURL(u, host) {
-					if id := extractConfluenceID(u); id != "" {
-						confluenceIDs = appendUnique(confluenceIDs, id)
-					}
-				} else if isAtlassianURL(u, host) {
-					// skip internal Atlassian URLs that aren't Confluence pages
-				} else {
-					webURLs = appendUnique(webURLs, u)
+				if u != "" {
+					allLinks = appendUnique(allLinks, u)
 				}
 			}
 		}
@@ -88,12 +102,74 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 		parentKey = issue.Fields.Parent.Key
 	}
 
-	subtaskKeys := make([]string, 0, len(issue.Fields.Subtasks))
+	subtaskKeys := make([]string, 0, len(issue.Fields.Subtasks)+len(issue.Fields.Issuelinks))
 	for _, st := range issue.Fields.Subtasks {
-		subtaskKeys = append(subtaskKeys, st.Key)
+		if key, ok := st["key"].(string); ok {
+			subtaskKeys = append(subtaskKeys, key)
+		}
+	}
+	for _, link := range issue.Fields.Issuelinks {
+		for _, key := range []string{"outwardIssue", "inwardIssue"} {
+			if val, ok := link[key].(map[string]interface{}); ok {
+				if issueKey, ok := val["key"].(string); ok {
+					subtaskKeys = append(subtaskKeys, issueKey)
+				}
+			}
+		}
 	}
 
+	// If this is an Epic, fetch its child issues.
+	s.logInfo("Checking if %s is an Epic. Type: %s", issueKey, issue.Fields.Issuetype.Name)
+	if issue.Fields.Issuetype.Name == "Epic" {
+		searchURL := fmt.Sprintf("https://%s/rest/api/3/search", host)
+		jql := fmt.Sprintf(`"Epic Link" = %s OR parent = %s`, issueKey, issueKey)
+
+		// Body for search
+		jsonBody, _ := json.Marshal(map[string]string{"jql": jql})
+
+		data, statusCode, err := doRequestWithBody(client, "POST", searchURL, email, token, jsonBody)
+		if err == nil && statusCode >= 200 && statusCode < 300 {
+			var searchResp struct {
+				Issues []struct {
+					Key string `json:"key"`
+				} `json:"issues"`
+			}
+			if json.Unmarshal(data, &searchResp) == nil {
+				s.logInfo("Found %d issues for Epic %s", len(searchResp.Issues), issueKey)
+				for _, iss := range searchResp.Issues {
+					subtaskKeys = appendUnique(subtaskKeys, iss.Key)
+				}
+			} else {
+				s.logError("Failed to unmarshal search response: %v", err)
+			}
+		} else {
+			s.logError("Search request failed: status %d, err %v", statusCode, err)
+		}
+	}
+
+	// Canonical URL
 	canonicalURL := fmt.Sprintf("https://%s/browse/%s", host, issueKey)
+
+	// Classify all gathered links.
+	var confluenceIDs, jiraKeys, webURLs []string
+	for _, u := range allLinks {
+		// Resolve relative links.
+		if strings.HasPrefix(u, "/") {
+			u = "https://" + host + u
+		}
+		if isConfluenceURL(u, host) {
+			if id := extractConfluenceID(u); id != "" {
+				confluenceIDs = appendUnique(confluenceIDs, id)
+			}
+		} else if strings.Contains(u, "/browse/") {
+			if key := extractJiraKeyFromURL(u); key != "" {
+				jiraKeys = appendUnique(jiraKeys, key)
+			}
+		} else {
+			webURLs = appendUnique(webURLs, u)
+		}
+	}
+
 	return &JiraResult{
 		Item: types.Item{
 			Type:    types.ItemTypeJira,
@@ -103,10 +179,29 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 			Content: sb.String(),
 		},
 		ParentKey:     parentKey,
-		SubtaskKeys:   subtaskKeys,
+		SubtaskKeys:   append(subtaskKeys, jiraKeys...),
 		ConfluenceIDs: confluenceIDs,
 		WebURLs:       webURLs,
 	}, nil
+}
+
+func extractJiraKeyFromURL(u string) string {
+	parts := strings.Split(u, "/browse/")
+	if len(parts) < 2 {
+		return ""
+	}
+	seg := parts[len(parts)-1]
+	// Strip query/fragment.
+	for _, sep := range []string{"?", "#"} {
+		if idx := strings.Index(seg, sep); idx != -1 {
+			seg = seg[:idx]
+		}
+	}
+	seg = strings.TrimRight(seg, "/")
+	if regexp.MustCompile(`^[A-Z]+-\d+$`).MatchString(seg) {
+		return seg
+	}
+	return ""
 }
 
 // extractTextFromADF recursively walks an Atlassian Document Format (ADF) node
@@ -422,10 +517,11 @@ func adfTable(v map[string]interface{}, depth int) string {
 	return out.String() + "\n"
 }
 
-// extractLinksFromADF walks ADF and collects Confluence page IDs and web URLs.
-func extractLinksFromADF(node interface{}, host string) (confluenceIDs, webURLs []string) {
+// extractLinksFromADF walks ADF and collects all links.
+func extractLinksFromADF(node interface{}, host string) []string {
+	var links []string
 	if node == nil {
-		return
+		return links
 	}
 	switch v := node.(type) {
 	case map[string]interface{}:
@@ -440,13 +536,7 @@ func extractLinksFromADF(node interface{}, host string) (confluenceIDs, webURLs 
 					if attrs, ok := mMap["attrs"].(map[string]interface{}); ok {
 						href, _ := attrs["href"].(string)
 						if href != "" {
-							if isConfluenceURL(href, host) {
-								if id := extractConfluenceID(href); id != "" {
-									confluenceIDs = appendUnique(confluenceIDs, id)
-								}
-							} else if !isAtlassianURL(href, host) {
-								webURLs = appendUnique(webURLs, href)
-							}
+							links = appendUnique(links, href)
 						}
 					}
 				}
@@ -457,32 +547,22 @@ func extractLinksFromADF(node interface{}, host string) (confluenceIDs, webURLs 
 			for _, key := range []string{"href", "url"} {
 				href, _ := attrs[key].(string)
 				if href != "" {
-					if isConfluenceURL(href, host) {
-						if id := extractConfluenceID(href); id != "" {
-							confluenceIDs = appendUnique(confluenceIDs, id)
-						}
-					} else if !isAtlassianURL(href, host) {
-						webURLs = appendUnique(webURLs, href)
-					}
+					links = appendUnique(links, href)
 				}
 			}
 		}
 		// Recurse into content.
 		if content, ok := v["content"].([]interface{}); ok {
 			for _, child := range content {
-				cIDs, cURLs := extractLinksFromADF(child, host)
-				confluenceIDs = appendUnique(confluenceIDs, cIDs...)
-				webURLs = appendUnique(webURLs, cURLs...)
+				links = appendUnique(links, extractLinksFromADF(child, host)...)
 			}
 		}
 	case []interface{}:
 		for _, item := range v {
-			cIDs, cURLs := extractLinksFromADF(item, host)
-			confluenceIDs = appendUnique(confluenceIDs, cIDs...)
-			webURLs = appendUnique(webURLs, cURLs...)
+			links = appendUnique(links, extractLinksFromADF(item, host)...)
 		}
 	}
-	return
+	return links
 }
 
 var confluencePagePathRe = regexp.MustCompile(`/wiki/spaces/[^/]+/pages/(\d+)`)
@@ -521,7 +601,15 @@ func appendUnique(dst []string, items ...string) []string {
 }
 
 func doRequest(client *http.Client, method, url, email, token string) ([]byte, int, error) {
-	req, err := http.NewRequest(method, url, nil)
+	return doRequestWithBody(client, method, url, email, token, nil)
+}
+
+func doRequestWithBody(client *http.Client, method, url, email, token string, body []byte) ([]byte, int, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -529,6 +617,9 @@ func doRequest(client *http.Client, method, url, email, token string) ([]byte, i
 		req.SetBasicAuth(email, token)
 	}
 	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -536,11 +627,11 @@ func doRequest(client *http.Client, method, url, email, token string) ([]byte, i
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, resp.StatusCode, err
 	}
-	return body, resp.StatusCode, nil
+	return respBody, resp.StatusCode, nil
 }
 
 // Jira API response types.
@@ -551,12 +642,18 @@ type jiraIssue struct {
 }
 
 type jiraFields struct {
-	Summary     string       `json:"summary"`
-	Description interface{}  `json:"description"`
-	Status      jiraStatus   `json:"status"`
-	Parent      *jiraParent  `json:"parent"`
-	Subtasks    []jiraParent `json:"subtasks"`
-	Comment     jiraComments `json:"comment"`
+	Summary     string                   `json:"summary"`
+	Description interface{}              `json:"description"`
+	Status      jiraStatus               `json:"status"`
+	Parent      *jiraParent              `json:"parent"`
+	Subtasks    []map[string]interface{} `json:"subtasks"`
+	Issuelinks  []map[string]interface{} `json:"issuelinks"`
+	Comment     jiraComments             `json:"comment"`
+	Issuetype   jiraIssuetype            `json:"issuetype"`
+}
+
+type jiraIssuetype struct {
+	Name string `json:"name"`
 }
 
 type jiraStatus struct {
