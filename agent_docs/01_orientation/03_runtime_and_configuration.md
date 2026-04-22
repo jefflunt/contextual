@@ -32,6 +32,7 @@ See `contextual.config.example.yml` in the repo root for a fully annotated examp
 
 ```yaml
 planner: "sh -c command string with <promptFile> placeholder"
+max_context_length: 10240
 
 atlassian:
   host: your-org.atlassian.net
@@ -44,8 +45,9 @@ Go struct (`internal/config/config.go`):
 
 ```go
 type Config struct {
-    Atlassian AtlassianConfig `yaml:"atlassian"`
-    Planner   string          `yaml:"planner"`
+    Atlassian        AtlassianConfig `yaml:"atlassian"`
+    Planner          string          `yaml:"planner"`
+    MaxContextLength int             `yaml:"max_context_length"`
 }
 
 type AtlassianConfig struct {
@@ -56,11 +58,15 @@ type AtlassianConfig struct {
 }
 ```
 
+**Note**: `max_context_length` is required.
+
 **No environment variables are used.** All credentials come from the config file.
 
-## Required settings for Atlassian
+## Required settings
 
-`internal/spider` reads credentials from `cfg.Atlassian.*`.
+- `max_context_length`: Required to define the output size for the context file.
+- `atlassian.*`: Required if you want to fetch Jira or Confluence items.
+- `planner`: Required if you want to run `contextual plan`.
 
 If `cfg.Atlassian.Host` is empty:
 - Jira fetches are skipped with `[ERROR] atlassian.host not configured`

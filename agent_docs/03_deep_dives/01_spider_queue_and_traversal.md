@@ -2,7 +2,14 @@
 
 ## Executive summary
 
-`internal/spider.Spider.Run` performs a BFS traversal over a queue of items, expanding the queue based on references discovered in fetched content. It de-duplicates via a `visited` key to avoid infinite loops and redundant fetches.
+`internal/spider.Spider.Run` performs a **priority-driven traversal** over a queue of items, expanding the queue based on references discovered in fetched content.
+
+Prioritization is managed by a `container/heap` Priority Queue, which orders items based on:
+1.  **Nearness (`jumps`)**: Ascending (1, 2, 3...).
+2.  **Direction**: Prioritizing Children (`Down`) > Parents (`Up`) > Siblings (`Sibling`).
+3.  **Discovery Order**: Tie-breaker.
+
+This ensures that the most relevant, dependent content is fetched first.
 
 ## Control flow diagram
 
@@ -10,25 +17,18 @@
 seed args
   |
   v
-ParseItem -> enqueue seed
+ParseItem -> enqueue seed (PriorityQueue)
   |
   v
-while queue not empty:
-  pop front
+while PriorityQueue not empty:
+  pop item (highest priority)
   switch item.Type:
     Jira:
       FetchJira
-      enqueue parent/subtasks
-      enqueue referenced Confluence IDs
-      enqueue referenced Web URLs
-    Confluence:
-      FetchConfluence
-      enqueue child pages
-      enqueue referenced Jira keys
-      enqueue referenced Web URLs
-    Web:
-      FetchWeb
-      (no enqueue)
+      enqueue parent (DirectionUp)
+      enqueue subtasks (DirectionDown)
+      enqueue referenced Confluence/Web (DirectionDown)
+    ...
 ```
 
 ## De-duplication
@@ -37,17 +37,14 @@ Visited key:
 - `<type>:<id>` when ID exists
 - `<type>:<url>` otherwise
 
-Implications:
-- If a Jira key appears in many places, it is fetched once.
-- Web URLs are fetched once each.
+## Context Truncation
 
-## Non-obvious traversal rule: fromConfluence
+After spidering, `cmd/contextual/main.go` iterates through the prioritized results.
 
-Queue entry carries `fromConfluence bool` (currently only tracked; not used to change behavior elsewhere in shown code).
-
-This suggests future logic might treat Jira items discovered via Confluence differently (e.g., fetch fewer related issues). If you introduce such behavior, update docs + tests.
+Content is written to `context.md` in the exact priority order determined by the spider. Truncation is enforced by monitoring a byte counter (`bytesWritten`) against `MaxContextLength` during the writing phase. If adding the next item exceeds the limit, that item (and all subsequent, less relevant items) is omitted.
 
 ## Gotchas
 
-- Missing `atlassian_host` prevents Jira/Confluence fetches entirely (they are skipped with logs).
+- Missing `max_context_length` causes startup error.
+- Missing `atlassian_host` prevents Jira/Confluence fetches entirely.
 - Web fetches are intentionally non-spidering to prevent unbounded crawling.
