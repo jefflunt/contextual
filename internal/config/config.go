@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	Atlassian AtlassianConfig `yaml:"atlassian"`
-	Planner   string          `yaml:"planner"`
+	Atlassian        AtlassianConfig `yaml:"atlassian"`
+	Planner          string          `yaml:"planner"`
+	MaxContextLength int             `yaml:"max_context_length"`
 }
 
 type AtlassianConfig struct {
@@ -38,6 +39,9 @@ func Load() (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
+	}
+	if cfg.MaxContextLength == 0 {
+		return nil, errors.New("max_context_length is required in config.yml")
 	}
 	return &cfg, nil
 }

@@ -17,7 +17,23 @@
 #   planner: claude -p "read and perform the actions in the following file: <promptFile>"
 #   planner: gemini -p "read and perform the actions in the following file: <promptFile>"
 #   planner: opencode run "read and perform the actions in the following file: <promptFile>"
-planner: "copilot -p \"read and perform the actions in the following file: <promptFile>\" --allow-all-t    ools --allow-all-paths --autopilot -s"
+# planner: the command contextual will run to generate a plan file.
+#
+# The <promptFile> placeholder is required — contextual substitutes it with
+# the path to a temporary file containing the full prompt text.
+#
+# The recommended pattern is an inline prompt string that references the
+# prompt file using backtick syntax, which is understood by most AI CLIs:
+#
+#   planner: copilot -p "read and perform the actions in the following file: <promptFile>" --allow-all-tools --allow-all-paths --autopilot -s
+#   planner: claude -p "read and perform the actions in the following file: <promptFile>"
+#   planner: claude -p "read and perform the actions in the following file: <promptFile>"
+#   planner: gemini -p "read and perform the actions in the following file: <promptFile>"
+#   planner: opencode run "read and perform the actions in the following file: <promptFile>"
+planner: "copilot -p \"read and perform the actions in the following file: <promptFile>\" --allow-all-tools --allow-all-paths --autopilot -s"
+
+# max_context_length: the maximum size in bytes of the generated context.md file.
+max_context_length: 10240
 
 # atlassian: credentials for fetching Jira issues and Confluence pages.
 #
