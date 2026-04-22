@@ -30,6 +30,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Detect 'help' subcommand.
+	if len(args) > 0 && args[0] == "help" {
+		printHelp()
+		os.Exit(0)
+	}
+
 	// Detect 'plan' subcommand.
 	planMode := false
 	if len(args) > 0 && args[0] == "plan" {
@@ -81,39 +87,57 @@ func main() {
 		cfg = &config.Config{}
 	}
 
-	s := spider.New(cfg, lg)
-	items, err := s.Run(itemArgs)
-	if err != nil {
-		lg.Error("%v", err)
-		os.Exit(1)
+	// Validate required config options.
+	if cfg.MaxContextLength == 0 {
+		if planner.PromptYesNo("Max context length not set. Set to 10240? [y/N] ") {
+			cfg.MaxContextLength = 10240
+		} else {
+			lg.Error("max_context_length is required in config.yml")
+			os.Exit(1)
+		}
+	}
+	if cfg.Spider.MaxHops == 0 {
+		if planner.PromptYesNo("Spider max hops not set. Set to 2? [y/N] ") {
+			cfg.Spider.MaxHops = 2
+		} else {
+			lg.Error("spider.max_hops is required in config.yml")
+			os.Exit(1)
+		}
 	}
 
-	// Resolve the output directory.
-	// In plan mode: agent_docs/plans/<slug>/ or ./<slug>/
-	// In fetch mode: current working directory
+	s := spider.New(cfg, lg)
+
+	// Resolve the output directory BEFORE fetching, to check for overwrite early.
 	var outputDir string
+	var errDir error
+
 	if planMode {
-		if len(items) == 0 {
-			lg.Error("No items fetched; cannot produce a plan file.")
-			os.Exit(1)
-		}
-		outputDir, err = planner.ResolveOutputDir(items[0])
+		// Need primary item to determine output directory.
+		primaryItem, err := s.ParseItem(itemArgs[0])
 		if err != nil {
-			lg.Error("Could not determine output directory: %v", err)
+			lg.Error("Could not parse primary item: %v", err)
 			os.Exit(1)
 		}
+		outputDir, errDir = planner.ResolveOutputDir(*primaryItem)
 	} else {
-		outputDir, err = os.Getwd()
-		if err != nil {
-			lg.Error("Could not determine working directory: %v", err)
-			os.Exit(1)
-		}
+		outputDir, errDir = os.Getwd()
+	}
+
+	if errDir != nil {
+		lg.Error("Could not determine output directory: %v", errDir)
+		os.Exit(1)
 	}
 
 	// Write context.md — confirm overwrite if it already exists.
 	contextPath := filepath.Join(outputDir, "context.md")
 	if !planner.ConfirmOverwrite(contextPath) {
 		fmt.Fprintln(os.Stderr, "Aborted.")
+		os.Exit(1)
+	}
+
+	items, err := s.Run(itemArgs)
+	if err != nil {
+		lg.Error("%v", err)
 		os.Exit(1)
 	}
 
@@ -184,6 +208,18 @@ func writeItem(f *os.File, item types.Item) {
 	fmt.Fprintln(f)
 	fmt.Fprintln(f, item.Content)
 	fmt.Fprintln(f)
+}
+
+func printHelp() {
+	fmt.Println("contextual: fetch and assemble context for AI agents.")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]")
+	fmt.Println("  contextual plan [--verbose|-v] [--progress|-p] <item> [<item> ...]")
+	fmt.Println("  contextual version")
+	fmt.Println("  contextual help")
+	fmt.Println()
+	fmt.Println("For more information, see: https://github.com/jefflunt/contextual/")
 }
 
 func itemTypeName(t types.ItemType) string {

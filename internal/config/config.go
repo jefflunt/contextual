@@ -12,13 +12,17 @@ type Config struct {
 	Atlassian        AtlassianConfig `yaml:"atlassian"`
 	Planner          string          `yaml:"planner"`
 	MaxContextLength int             `yaml:"max_context_length"`
+	Spider           SpiderConfig    `yaml:"spider"`
 }
 
 type AtlassianConfig struct {
-	Host           string `yaml:"host"`
-	APIUser        string `yaml:"api_user"`
-	APIToken       string `yaml:"api_token"`
-	MaxSpiderJumps int    `yaml:"max_spider_jumps"`
+	Host     string `yaml:"host"`
+	APIUser  string `yaml:"api_user"`
+	APIToken string `yaml:"api_token"`
+}
+
+type SpiderConfig struct {
+	MaxHops int `yaml:"max_hops"`
 }
 
 func Load() (*Config, error) {
@@ -39,9 +43,6 @@ func Load() (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
-	}
-	if cfg.MaxContextLength == 0 {
-		return nil, errors.New("max_context_length is required in config.yml")
 	}
 	return &cfg, nil
 }

@@ -194,13 +194,13 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 	host := ""
 	email := ""
 	token := ""
-	maxJumps := 5 // Default
+	maxHops := 2 // Default
 	if s.Config != nil {
 		host = s.Config.Atlassian.Host
 		email = s.Config.Atlassian.APIUser
 		token = s.Config.Atlassian.APIToken
-		if s.Config.Atlassian.MaxSpiderJumps > 0 {
-			maxJumps = s.Config.Atlassian.MaxSpiderJumps
+		if s.Config.Spider.MaxHops > 0 {
+			maxHops = s.Config.Spider.MaxHops
 		}
 	}
 
@@ -210,8 +210,8 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 		entry := heap.Pop(pq).(*queueEntry)
 		item := entry.item
 
-		if entry.jumps >= maxJumps {
-			s.logInfo("Max spider jumps reached for %s, skipping expansion", item.URL)
+		if entry.jumps >= maxHops {
+			s.logInfo("Max spider hops reached for %s, skipping expansion", item.URL)
 			results = append(results, item)
 			continue
 		}

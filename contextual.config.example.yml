@@ -35,6 +35,12 @@ planner: "copilot -p \"read and perform the actions in the following file: <prom
 # max_context_length: the maximum size in bytes of the generated context.md file.
 max_context_length: 10240
 
+# spider: settings for spidering behaviour
+#
+# max_hops: the maximum number of spider jumps to make.
+spider:
+  max_hops: 2
+
 # atlassian: credentials for fetching Jira issues and Confluence pages.
 #
 # host:      your Atlassian Cloud hostname, e.g. your-org.atlassian.net
@@ -45,4 +51,3 @@ atlassian:
   host: your-org.atlassian.net
   api_user: you@example.com
   api_token: your-api-token-here
-  max_spider_jumps: 5
