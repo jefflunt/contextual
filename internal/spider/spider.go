@@ -1,6 +1,7 @@
 package spider
 
 import (
+	"container/heap"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,6 +11,64 @@ import (
 	"github.com/jluntpcty/contextual/internal/logger"
 	"github.com/jluntpcty/contextual/internal/types"
 )
+
+type Direction int
+
+const (
+	DirectionSource Direction = iota
+	DirectionDown
+	DirectionUp
+	DirectionSibling
+)
+
+type queueEntry struct {
+	item           types.Item
+	fromConfluence bool
+	jumps          int
+	direction      Direction
+	index          int // required for heap
+}
+
+// PriorityQueue implements heap.Interface and holds queueEntries.
+type PriorityQueue []*queueEntry
+
+func (pq PriorityQueue) Len() int { return len(pq) }
+
+func (pq PriorityQueue) Less(i, j int) bool {
+	// 1. Nearness (`jumps` - ascending).
+	if pq[i].jumps != pq[j].jumps {
+		return pq[i].jumps < pq[j].jumps
+	}
+	// 2. Direction (Prioritize Down > Up > Sibling).
+	if pq[i].direction != pq[j].direction {
+		return pq[i].direction < pq[j].direction
+	}
+	// 3. Discovery Order (tie-breaker).
+	return pq[i].index < pq[j].index
+}
+
+func (pq PriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].index = i
+	pq[j].index = j
+}
+
+func (pq *PriorityQueue) Push(x interface{}) {
+	n := len(*pq)
+	item := x.(*queueEntry)
+	item.index = n
+	*pq = append(*pq, item)
+}
+
+func (pq *PriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil // avoid memory leak
+	item.index = -1
+	*pq = old[0 : n-1]
+	return item
+}
 
 var (
 	jiraKeyRe      = regexp.MustCompile(`^[A-Z]+-\d+$`)
@@ -88,13 +147,8 @@ func (s *Spider) ParseItem(arg string) (*types.Item, error) {
 }
 
 func (s *Spider) Run(args []string) ([]types.Item, error) {
-	type queueEntry struct {
-		item           types.Item
-		fromConfluence bool // true when this Jira item was discovered via Confluence
-		jumps          int
-	}
-
-	var queue []queueEntry
+	pq := &PriorityQueue{}
+	heap.Init(pq)
 	visited := map[string]bool{} // key: "<type>:<canonical_url>"
 
 	key := func(item *types.Item) string {
@@ -114,11 +168,16 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 		return string(item.Type) + ":" + canonicalURL
 	}
 
-	enqueue := func(item types.Item, fromConfluence bool, jumps int) {
+	enqueue := func(item types.Item, fromConfluence bool, jumps int, dir Direction) {
 		k := key(&item)
 		if !visited[k] {
 			visited[k] = true
-			queue = append(queue, queueEntry{item, fromConfluence, jumps})
+			heap.Push(pq, &queueEntry{
+				item:           item,
+				fromConfluence: fromConfluence,
+				jumps:          jumps,
+				direction:      dir,
+			})
 		}
 	}
 
@@ -129,7 +188,7 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 			s.logError("%v", err)
 			continue
 		}
-		enqueue(*item, false, 0)
+		enqueue(*item, false, 0, DirectionSource)
 	}
 
 	host := ""
@@ -147,10 +206,8 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 
 	var results []types.Item
 
-	for len(queue) > 0 {
-		entry := queue[0]
-		queue = queue[1:]
-
+	for pq.Len() > 0 {
+		entry := heap.Pop(pq).(*queueEntry)
 		item := entry.item
 
 		if entry.jumps >= maxJumps {
@@ -180,7 +237,7 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeJira,
 					ID:   result.ParentKey,
 					URL:  fmt.Sprintf("https://%s/browse/%s", host, result.ParentKey),
-				}, entry.fromConfluence, entry.jumps+1)
+				}, entry.fromConfluence, entry.jumps+1, DirectionUp)
 			}
 			for _, st := range result.SubtaskKeys {
 				s.logInfo("Enqueueing subtask/linked: %s", st)
@@ -188,7 +245,7 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeJira,
 					ID:   st,
 					URL:  fmt.Sprintf("https://%s/browse/%s", host, st),
-				}, entry.fromConfluence, entry.jumps+1)
+				}, entry.fromConfluence, entry.jumps+1, DirectionDown)
 			}
 			// Confluence pages and web URLs found in Jira.
 			for _, cid := range result.ConfluenceIDs {
@@ -196,10 +253,10 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeConfluence,
 					ID:   cid,
 					URL:  fmt.Sprintf("https://%s/wiki/rest/api/content/%s", host, cid),
-				}, false, entry.jumps+1)
+				}, false, entry.jumps+1, DirectionDown)
 			}
 			for _, u := range result.WebURLs {
-				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false, entry.jumps+1)
+				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false, entry.jumps+1, DirectionDown)
 			}
 
 		case types.ItemTypeConfluence:
@@ -221,7 +278,7 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeConfluence,
 					ID:   cid,
 					URL:  fmt.Sprintf("https://%s/wiki/rest/api/content/%s", host, cid),
-				}, false, entry.jumps+1)
+				}, false, entry.jumps+1, DirectionDown)
 			}
 			// Jira keys found in Confluence (fetch with parent/child expansion).
 			for _, jk := range result.JiraKeys {
@@ -229,11 +286,11 @@ func (s *Spider) Run(args []string) ([]types.Item, error) {
 					Type: types.ItemTypeJira,
 					ID:   jk,
 					URL:  fmt.Sprintf("https://%s/browse/%s", host, jk),
-				}, true, entry.jumps+1)
+				}, true, entry.jumps+1, DirectionDown)
 			}
 			// Web URLs directly linked from Confluence.
 			for _, u := range result.WebURLs {
-				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false, entry.jumps+1)
+				enqueue(types.Item{Type: types.ItemTypeWeb, URL: u}, false, entry.jumps+1, DirectionDown)
 			}
 
 		case types.ItemTypeWeb:

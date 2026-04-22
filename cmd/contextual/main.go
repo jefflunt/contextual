@@ -139,8 +139,16 @@ func main() {
 	fmt.Fprintf(f, "Total items: %d\n", len(items))
 	fmt.Fprintln(f)
 
-	for _, item := range items {
+	var bytesWritten int
+	for i, item := range items {
+		// Calculate size of item: content + approximate metadata overhead
+		itemSize := len(item.Content) + 300
+		if cfg.MaxContextLength > 0 && bytesWritten+itemSize > cfg.MaxContextLength {
+			lg.Info("Reached max context length (%d bytes); truncating remaining %d items", cfg.MaxContextLength, len(items)-i)
+			break
+		}
 		writeItem(f, item)
+		bytesWritten += itemSize
 	}
 
 	if !planMode {

@@ -32,7 +32,7 @@ func TestLoadValidFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content := "atlassian:\n  host: example.atlassian.net\n  api_user: user@example.com\n  api_token: secret\n"
+	content := "atlassian:\n  host: example.atlassian.net\n  api_user: user@example.com\n  api_token: secret\nmax_context_length: 10240\n"
 	if err := os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +49,9 @@ func TestLoadValidFile(t *testing.T) {
 	}
 	if cfg.Atlassian.APIToken != "secret" {
 		t.Errorf("expected secret, got %q", cfg.Atlassian.APIToken)
+	}
+	if cfg.MaxContextLength != 10240 {
+		t.Errorf("expected 10240, got %d", cfg.MaxContextLength)
 	}
 }
 
