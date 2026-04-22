@@ -38,13 +38,16 @@ jobs:
         with:
           go-version: '1.22'
       - name: Build
+        shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
           VERSION=${{ github.ref_name }}-${{ matrix.goarch }}
           EXT=""
-          if [ "${{ matrix.goos }}" == "windows" ]; then EXT=".exe"; fi
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            EXT=".exe"
+          fi
           go build -ldflags "-X github.com/jluntpcty/contextual/pkg/version.Version=${VERSION}" -o contextual-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} ./cmd/contextual
 
       - name: Upload binaries
