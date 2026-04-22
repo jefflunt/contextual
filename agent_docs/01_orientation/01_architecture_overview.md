@@ -49,7 +49,7 @@ Spider.Run(args)
   |
   +--> ParseItem(arg) classifies inputs
   |
-  +--> BFS queue traversal
+  +--> Priority-driven BFS traversal
          |
          +--> fetcher.FetchJira(host, email, token, id)       -> Item + links (parent/subtasks/confluence/web)
          +--> fetcher.FetchConfluence(host, email, token, id) -> Item + links (children/jira/web)
@@ -59,7 +59,7 @@ Spider.Run(args)
 ConfirmOverwrite(contextPath)   <- interactive prompt if context.md exists
   |
   v
-Write context.md to cwd         <- AI-readable preamble + item blocks
+Write context.md to cwd         <- AI-readable preamble + item blocks (truncated at MaxContextLength)
   |
   v
 print contextPath to stdout
