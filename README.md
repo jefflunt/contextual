@@ -2,46 +2,56 @@
 
 CLI tool for fetching Jira issues, Confluence pages, and generic web pages and assembling them into **AI-ready context blocks** (`context.md`).
 
-Features **priority-driven spidering** and **context size truncation** to ensure only the most relevant, nearest content fits into your LLM's context window.
+When working with LLMs, managing context windows is hard. `contextual` features **priority-driven spidering** and **context size truncation** to ensure only the most relevant, nearest content fits into your LLM's context window.
 
-## Usage
+## Quick Start / Installation
 
-```bash
-contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]
-contextual plan [--verbose|-v] [--progress|-p] <item> [<item> ...]
-contextual version
-contextual help
-```
-
-## Build
+The fastest way to install `contextual` is via our installation script. This works seamlessly on macOS, Linux, and in automated AI agent environments.
 
 ```bash
-./script/build
+curl -sSfL https://raw.githubusercontent.com/jefflunt/contextual/main/install.sh | bash
 ```
 
-## Configuration
+## Basic Usage
 
-Required: `~/.contextual/config.yml`. See `contextual.config.example.yml` for the structure.
-
-- `max_context_length`: Maximum size (in bytes) of the generated context.md.
-- `spider.max_hops`: Maximum number of jumps to make when spidering connected items.
-- `atlassian`: Credentials and host for Jira/Confluence.
-- `planner`: Command string for `plan` mode (with `<promptFile>` placeholder).
-
-## Examples
-
-Fetch items and generate context (truncated to `max_context_length`):
+Fetch items and generate a `context.md` file (automatically truncated to your configured `max_context_length`):
 
 ```bash
 contextual CTX-1234
+contextual https://example.com/docs/api
 ```
 
-Generate a plan file for an AI agent:
+You can pass multiple items at once. Add `--verbose` (`-v`) or `--progress` (`-p`) to see the spidering graph in action.
+
+```bash
+contextual -v -p SIPS-123 SIPS-124
+```
+
+## Usage for AI Agents
+
+`contextual` is designed to be highly scriptable by AI coding agents. Agents can use the `plan` feature to generate an execution plan file based on context:
 
 ```bash
 contextual plan CTX-1234
 ```
 
-## Agent docs
+For more deep-dive documentation aimed specifically at AI agents (architecture, patterns), see [`agent_docs/README.md`](agent_docs/README.md).
 
-See [`agent_docs/`](agent_docs/README.md) for agent-first documentation (architecture, patterns, deep dives).
+## Configuration
+
+`contextual` requires a configuration file located at `~/.contextual/config.yml`.
+
+See `contextual.config.example.yml` in this repository for a complete structure. Key settings include:
+
+- `max_context_length`: Maximum size (in bytes) of the generated `context.md`. Ensures you don't blow out your LLM context window.
+- `spider.max_hops`: Maximum number of jumps to make when spidering connected items (e.g., from an Epic to a Task to a Subtask).
+- `atlassian`: Credentials and host for fetching Jira issues and Confluence pages.
+- `planner`: Command string for `plan` mode (with `<promptFile>` placeholder).
+
+## Building from Source
+
+If you want to contribute or build locally, we recommend running the full build, test, and install suite to ensure everything works smoothly on your machine:
+
+```bash
+./script/build-test-install
+```

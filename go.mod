@@ -1,4 +1,4 @@
-module github.com/jluntpcty/contextual
+module github.com/jefflunt/contextual
 
 go 1.21
 

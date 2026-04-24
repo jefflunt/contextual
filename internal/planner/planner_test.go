@@ -1,7 +1,7 @@
 package planner
 
 import (
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/types"
 	"testing"
 )
 

@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jluntpcty/contextual/internal/config"
-	"github.com/jluntpcty/contextual/internal/fetcher"
-	"github.com/jluntpcty/contextual/internal/logger"
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/config"
+	"github.com/jefflunt/contextual/internal/fetcher"
+	"github.com/jefflunt/contextual/internal/logger"
+	"github.com/jefflunt/contextual/internal/types"
 )
 
 type Direction int

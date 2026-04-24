@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jluntpcty/contextual/internal/config"
-	"github.com/jluntpcty/contextual/internal/logger"
-	"github.com/jluntpcty/contextual/internal/planner"
-	"github.com/jluntpcty/contextual/internal/prompt"
-	"github.com/jluntpcty/contextual/internal/spider"
-	"github.com/jluntpcty/contextual/internal/types"
-	"github.com/jluntpcty/contextual/pkg/version"
+	"github.com/jefflunt/contextual/internal/config"
+	"github.com/jefflunt/contextual/internal/logger"
+	"github.com/jefflunt/contextual/internal/planner"
+	"github.com/jefflunt/contextual/internal/prompt"
+	"github.com/jefflunt/contextual/internal/spider"
+	"github.com/jefflunt/contextual/internal/types"
+	"github.com/jefflunt/contextual/pkg/version"
 )
 
 func main() {

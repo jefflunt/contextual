@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/types"
 )
 
 //go:embed writing-plan-files.md

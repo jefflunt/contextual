@@ -10,7 +10,7 @@
 
 ## Build/runtime
 
-- Go module: `github.com/jluntpcty/contextual` (see `go.mod`)
+- Go module: `github.com/jefflunt/contextual` (see `go.mod`)
 - Scripts (no Makefile):
   - `script/build`              → `go build -o bin/contextual ./cmd/contextual/`
   - `script/test`               → `go test ./...`

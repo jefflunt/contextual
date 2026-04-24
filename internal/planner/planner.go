@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/types"
 )
 
 var slugSafeRe = regexp.MustCompile(`[^a-zA-Z0-9\-_]+`)

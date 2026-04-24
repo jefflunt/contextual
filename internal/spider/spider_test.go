@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jluntpcty/contextual/internal/config"
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/config"
+	"github.com/jefflunt/contextual/internal/types"
 )
 
 func newTestSpider(host string) *Spider {

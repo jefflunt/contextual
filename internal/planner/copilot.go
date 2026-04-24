@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jluntpcty/contextual/internal/logger"
+	"github.com/jefflunt/contextual/internal/logger"
 )
 
 const promptFilePlaceholder = "<promptFile>"

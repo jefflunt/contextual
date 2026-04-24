@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/types"
 )
 
 type WebResult struct {

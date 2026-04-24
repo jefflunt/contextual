@@ -25,6 +25,6 @@ echo "Building version: ${version}"
 mkdir -p bin
 
 echo "Building contextual..."
-go build -ldflags "-X github.com/jluntpcty/contextual/pkg/version.Version=${version}" -o "bin/contextual" "./cmd/contextual"
+go build -ldflags "-X github.com/jefflunt/contextual/pkg/version.Version=${version}" -o "bin/contextual" "./cmd/contextual"
 
 echo "Build complete. Binary is at bin/contextual."

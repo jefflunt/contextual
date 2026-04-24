@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jluntpcty/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/types"
 )
 
 type JiraResult struct {
