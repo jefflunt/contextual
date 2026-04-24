@@ -24,7 +24,7 @@ contextual https://example.com/docs/api
 You can pass multiple items at once. Add `--verbose` (`-v`) or `--progress` (`-p`) to see the spidering graph in action.
 
 ```bash
-contextual -v -p SIPS-123 SIPS-124
+contextual -v -p CTX-123 CTX-124
 ```
 
 ## Usage for AI Agents
