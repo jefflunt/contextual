@@ -1,0 +1,3 @@
+# Update the project documentation within the `agent_docs/` directory by removing all references, instructions, and architectural mentions of the planner subcommand, planner package, and associated configurations.
+
+This task requires scanning and editing the Markdown files within the `agent_docs/` directory (e.g., architecture overviews, domain models, runtime configuration guides). The objective is to identify and remove all references to the 'planner' subcommand, the 'internal/planner' package, and any configurations previously associated with it. After completion, the documentation should accurately represent the current architectural state of the project, which no longer includes the planner functionality.

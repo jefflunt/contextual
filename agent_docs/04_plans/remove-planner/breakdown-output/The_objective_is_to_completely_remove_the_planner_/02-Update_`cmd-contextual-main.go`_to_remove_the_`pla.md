@@ -1,0 +1,3 @@
+# Update `cmd/contextual/main.go` to remove the `plan` subcommand, update help menus, remove subprocess runner invocation, and switch to the new `prompt` package.
+
+Modify `cmd/contextual/main.go` to completely remove the `plan` subcommand, its associated arguments, and any corresponding logic. Update the CLI's help menus and usage text to reflect the removal of planner features. Eliminate the subprocess runner invocation that was previously used to execute planner commands. Finally, adjust imports and internal usages to align with the newly repurposed `internal/prompt` package, which now holds terminal utilities rather than planner prompt generation.
