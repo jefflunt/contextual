@@ -10,7 +10,6 @@ import (
 
 type Config struct {
 	Atlassian        AtlassianConfig `yaml:"atlassian"`
-	Planner          string          `yaml:"planner"`
 	MaxContextLength int             `yaml:"max_context_length"`
 	Spider           SpiderConfig    `yaml:"spider"`
 }

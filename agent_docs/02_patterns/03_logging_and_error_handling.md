@@ -8,7 +8,7 @@ Use when adding new functionality that can fail per-item (network errors, parse 
 
 All logging goes through `internal/logger.Logger` — **do not use `log.Printf` or `fmt.Fprintf(os.Stderr, ...)` directly** in spider or fetcher code.
 
-The logger is constructed in `cmd/contextual/main.go` and passed down to `spider.New(cfg, lg)` and `planner.RunPlanner(...)`.
+The logger is constructed in `cmd/contextual/main.go` and passed down to `spider.New(cfg, lg)`.
 
 ### Modes (set via CLI flags)
 
@@ -24,14 +24,14 @@ Regardless of mode, **all log entries are always written** to `~/.contextual/log
 
 ```
 2026-04-04T22:07:39Z [INFO] Fetching jira: CTX-1234
-2026-04-04T22:07:40Z [ERROR] Planner exited with code 1: copilot -p ...
+2026-04-04T22:07:40Z [ERROR] Fetch failed for confluence: 1234
 ```
 
 ### Methods
 
 - `lg.Info(format, args...)` — fetch progress, invocation details
 - `lg.Warn(format, args...)` — configuration issues, non-fatal setup problems
-- `lg.Error(format, args...)` — fetch failures, planner failures
+- `lg.Error(format, args...)` — fetch failures
 
 ## Strategy: skip vs fail
 
@@ -41,13 +41,10 @@ Prefer "skip item and continue" for:
 - fetch errors for a single item
 
 Fail the whole run (exit non-zero) only for:
-- missing or misconfigured `planner` key when in plan mode
-- planner process exiting non-zero
 - truly fatal setup errors (logger init failure, etc.)
 
 ## Where to implement
 
 - Parse errors: in `internal/spider.Run` seed loop — call `s.logError(...)`, `continue`.
 - Fetch errors: in each `case` branch of `Run(...)` — call `s.logError(...)`, `continue`.
-- Planner errors: in `internal/planner/copilot.go` — call `lg.Error(...)`, return error to `main.go`.
 - Config/setup warnings: in `cmd/contextual/main.go` — call `lg.Warn(...)`, continue.

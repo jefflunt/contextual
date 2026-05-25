@@ -9,7 +9,7 @@
 ## Repository shape
 
 ```
-cmd/contextual/main.go                     — CLI entrypoint; flag parsing; config + logger construction; writes context.md; invokes planner
+cmd/contextual/main.go                     — CLI entrypoint; flag parsing; config + logger construction; writes context.md
 internal/spider/spider.go                  — argument classification + BFS traversal; orchestrates fetchers
 internal/fetcher/jira.go                   — Jira fetch + ADF→Markdown conversion
 internal/fetcher/confluence.go             — Confluence fetch + XHTML→Markdown conversion
@@ -17,10 +17,7 @@ internal/fetcher/web.go                    — generic HTTP fetch
 internal/config/config.go                  — config loading from ~/.contextual/config.yml
 internal/types/types.go                    — shared domain types (Item, ItemType)
 internal/logger/logger.go                  — Silent/Progress/Verbose logger; always writes to ~/.contextual/log.log
-internal/planner/planner.go               — ResolveOutputDir, ConfirmOverwrite, ItemSlug
-internal/planner/copilot.go               — RunPlanner: temp file + <promptFile> substitution + sh -c execution
-internal/prompt/prompt.go                  — BuildPlanPrompt; embeds plan spec via go:embed
-internal/prompt/writing-plan-files.md      — embedded plan file spec
+internal/prompt/prompt.go                  — PromptYesNo, ConfirmOverwrite interactive terminal prompts
 script/build                               — build binary to bin/contextual
 script/test                                — run all tests
 script/install                             — install binary to $GOPATH/bin
@@ -30,7 +27,7 @@ contextual.config.example.yml             — annotated config example for users
 
 ## Primary execution flow
 
-### Fetch mode (`contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]`)
+## Primary execution flow
 
 ```
 CLI args
@@ -65,40 +62,11 @@ Write context.md to cwd         <- AI-readable preamble + item blocks (truncated
 print contextPath to stdout
 ```
 
-### Plan mode (`contextual plan [--verbose|-v] [--progress|-p] <item> [<item> ...]`)
-
-Same as fetch mode through writing context.md, then:
-
-```
-  |
-  v
-planner.ResolveOutputDir(items[0])
-  ├── agent_docs/plans/<slug>/   if agent_docs/plans/ exists
-  ├── prompt to create it        if only agent_docs/ exists
-  └── ./<slug>/                  fallback
-  |
-  v
-Write context.md to outputDir
-  |
-  v
-prompt.BuildPlanPrompt(contextPath, primaryItem)
-  |
-  v
-planner.RunPlanner(cfg.Planner, promptText, outputDir, lg)
-  <- writes prompt to temp file
-  <- replaces <promptFile> in cfg.Planner with temp file path
-  <- executes full command string via sh -c
-  |
-  v
-print plan.md path to stdout
-```
-
 ## Core packages
 
 ### `cmd/contextual`
 - Owns process concerns: flag parsing, config loading, logger construction, exit codes, stdout printing.
 - Flags: `--verbose`/`-v`, `--progress`/`-p`
-- Subcommand: `plan` (detected before flag parsing via `args[0] == "plan"`)
 
 ### `internal/spider`
 - Owns classification and traversal orchestration.
@@ -114,7 +82,6 @@ print plan.md path to stdout
 
 ### `internal/config`
 - `Config.Atlassian.{Host, APIUser, APIToken, MaxSpiderJumps}` — Atlassian credentials and spidering depth control.
-- `Config.Planner` — shell command template; must contain `<promptFile>` placeholder.
 - CLI tolerates config load failure (warn + continue with empty config).
 
 ### `internal/logger`
@@ -122,15 +89,9 @@ print plan.md path to stdout
 - Always writes structured entries to `~/.contextual/log.log` (ISO 8601 UTC).
 - Methods: `Info`, `Warn`, `Error`.
 
-### `internal/planner`
-- `ResolveOutputDir(item)` — three-tier output directory logic.
-- `ConfirmOverwrite(path)` — interactive prompt if file already exists.
-- `ItemSlug(item)` — slug derived from item ID or URL.
-- `RunPlanner(plannerCmd, promptText, outputDir, lg)` — executes configured planner via shell.
-
 ### `internal/prompt`
-- `BuildPlanPrompt(contextPath, primaryItem)` — constructs the plan prompt string.
-- Plan file spec embedded via `//go:embed writing-plan-files.md`.
+- `PromptYesNo(question)` — interactive terminal helper.
+- `ConfirmOverwrite(path)` — checks if file exists, prompts before overwriting.
 
 ### `internal/types`
 - `Item`, `ItemType` — shared domain types used across all packages.
@@ -141,4 +102,3 @@ print plan.md path to stdout
 - On per-item failures: log `[ERROR]` and continue traversal — do not abort the run.
 - All credentials come from `~/.contextual/config.yml`, not environment variables.
 - Scripts in `script/` are the canonical build/test/install interface (no Makefile).
-- `RunPlanner` executes via `sh -c` so the full command string (quoting, backticks, etc.) is shell-interpreted.

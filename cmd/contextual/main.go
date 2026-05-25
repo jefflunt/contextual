@@ -10,7 +10,6 @@ import (
 
 	"github.com/jefflunt/contextual/internal/config"
 	"github.com/jefflunt/contextual/internal/logger"
-	"github.com/jefflunt/contextual/internal/planner"
 	"github.com/jefflunt/contextual/internal/prompt"
 	"github.com/jefflunt/contextual/internal/spider"
 	"github.com/jefflunt/contextual/internal/types"
@@ -36,13 +35,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Detect 'plan' subcommand.
-	planMode := false
-	if len(args) > 0 && args[0] == "plan" {
-		planMode = true
-		args = args[1:]
-	}
-
 	// Parse flags.
 	fs := flag.NewFlagSet("contextual", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -57,11 +49,7 @@ func main() {
 	itemArgs := fs.Args()
 
 	if len(itemArgs) == 0 {
-		if planMode {
-			fmt.Fprintln(os.Stderr, "Usage: contextual plan [--verbose|-v] [--progress|-p] <item> [<item> ...]")
-		} else {
-			fmt.Fprintln(os.Stderr, "Usage: contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]")
-		}
+		fmt.Fprintln(os.Stderr, "Usage: contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]")
 		os.Exit(1)
 	}
 
@@ -89,7 +77,7 @@ func main() {
 
 	// Validate required config options.
 	if cfg.MaxContextLength == 0 {
-		if planner.PromptYesNo("Max context length not set. Set to 10240? [y/N] ") {
+		if prompt.PromptYesNo("Max context length not set. Set to 10240? [y/N] ") {
 			cfg.MaxContextLength = 10240
 		} else {
 			lg.Error("max_context_length is required in config.yml")
@@ -97,7 +85,7 @@ func main() {
 		}
 	}
 	if cfg.Spider.MaxHops == 0 {
-		if planner.PromptYesNo("Spider max hops not set. Set to 2? [y/N] ") {
+		if prompt.PromptYesNo("Spider max hops not set. Set to 2? [y/N] ") {
 			cfg.Spider.MaxHops = 2
 		} else {
 			lg.Error("spider.max_hops is required in config.yml")
@@ -108,21 +96,7 @@ func main() {
 	s := spider.New(cfg, lg)
 
 	// Resolve the output directory BEFORE fetching, to check for overwrite early.
-	var outputDir string
-	var errDir error
-
-	if planMode {
-		// Need primary item to determine output directory.
-		primaryItem, err := s.ParseItem(itemArgs[0])
-		if err != nil {
-			lg.Error("Could not parse primary item: %v", err)
-			os.Exit(1)
-		}
-		outputDir, errDir = planner.ResolveOutputDir(*primaryItem)
-	} else {
-		outputDir, errDir = os.Getwd()
-	}
-
+	outputDir, errDir := os.Getwd()
 	if errDir != nil {
 		lg.Error("Could not determine output directory: %v", errDir)
 		os.Exit(1)
@@ -130,7 +104,7 @@ func main() {
 
 	// Write context.md — confirm overwrite if it already exists.
 	contextPath := filepath.Join(outputDir, "context.md")
-	if !planner.ConfirmOverwrite(contextPath) {
+	if !prompt.ConfirmOverwrite(contextPath) {
 		fmt.Fprintln(os.Stderr, "Aborted.")
 		os.Exit(1)
 	}
@@ -175,24 +149,7 @@ func main() {
 		bytesWritten += itemSize
 	}
 
-	if !planMode {
-		fmt.Println(contextPath)
-		return
-	}
-
-	// Plan mode: build prompt and invoke planner to write plan.md.
-	primaryItem := items[0]
-	promptText := prompt.BuildPlanPrompt(contextPath, primaryItem)
-
-	lg.Info("Context file: %s", contextPath)
-	lg.Info("Plan file will be written to: %s", filepath.Join(outputDir, "plan.md"))
-
-	if err := planner.RunPlanner(cfg.Planner, promptText, outputDir, lg); err != nil {
-		lg.Error("%v", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(filepath.Join(outputDir, "plan.md"))
+	fmt.Println(contextPath)
 }
 
 func writeItem(f *os.File, item types.Item) {
@@ -215,7 +172,6 @@ func printHelp() {
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]")
-	fmt.Println("  contextual plan [--verbose|-v] [--progress|-p] <item> [<item> ...]")
 	fmt.Println("  contextual version")
 	fmt.Println("  contextual help")
 	fmt.Println()

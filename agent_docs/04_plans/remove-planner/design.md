@@ -35,6 +35,12 @@ The core changes are:
 ## Implementation Backlog
 
 ### Pending
+- *None*
+
+### Current
+- *None*
+
+### Completed
 - **Task 1: Repurpose `internal/prompt` for CLI prompt utilities**
   - Delete `internal/prompt/writing-plan-files.md`.
   - Rewrite `internal/prompt/prompt.go` to house `PromptYesNo` and `ConfirmOverwrite` from `internal/planner/planner.go`.
@@ -52,12 +58,10 @@ The core changes are:
   - Completely delete `internal/planner/` directory.
 - **Task 5: Update project documentation**
   - Update architectural documentation in `agent_docs/01_orientation/01_architecture_overview.md`, `03_runtime_and_configuration.md`, `agent_docs/02_patterns/03_logging_and_error_handling.md`, etc. to remove references to the `planner` package, plan subcommand, and config.
-
-### Current
-- *None*
-
-### Completed
-- *None*
+- **Verification: Run all tests and verify build**
+  - Compile the binary via `./script/build`.
+  - Run all tests via `./script/test` (including prompt unit tests).
+  - Install binary via `./script/install`.
 
 ## Checklist & TDD Requirements
 - All tests in the test suite must pass (`go test ./...`).

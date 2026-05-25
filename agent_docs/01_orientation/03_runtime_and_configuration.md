@@ -5,7 +5,6 @@
 - [Config file](#config-file)
 - [Config structure](#config-structure)
 - [Required settings for Atlassian](#required-settings-for-atlassian)
-- [Required settings for plan mode](#required-settings-for-plan-mode)
 - [Failure behavior](#failure-behavior)
 
 ## Build/runtime
@@ -31,7 +30,6 @@ See `contextual.config.example.yml` in the repo root for a fully annotated examp
 ## Config structure
 
 ```yaml
-planner: "sh -c command string with <promptFile> placeholder"
 max_context_length: 10240
 
 atlassian:
@@ -46,7 +44,6 @@ Go struct (`internal/config/config.go`):
 ```go
 type Config struct {
     Atlassian        AtlassianConfig `yaml:"atlassian"`
-    Planner          string          `yaml:"planner"`
     MaxContextLength int             `yaml:"max_context_length"`
 }
 
@@ -66,7 +63,6 @@ type AtlassianConfig struct {
 
 - `max_context_length`: Required to define the output size for the context file.
 - `atlassian.*`: Required if you want to fetch Jira or Confluence items.
-- `planner`: Required if you want to run `contextual plan`.
 
 If `cfg.Atlassian.Host` is empty:
 - Jira fetches are skipped with `[ERROR] atlassian.host not configured`
@@ -74,25 +70,8 @@ If `cfg.Atlassian.Host` is empty:
 
 Missing `APIUser`/`APIToken` are not validated at startup but will cause Atlassian API auth failures at fetch time.
 
-## Required settings for plan mode
-
-`cfg.Planner` must be set for `contextual plan` to work.
-
-`RunPlanner` validates:
-1. `cfg.Planner` is non-empty — error if missing, with instructions to set it.
-2. `cfg.Planner` contains the `<promptFile>` placeholder — error if missing, with example.
-
-The placeholder is substituted at runtime with the path to a temp file containing the full prompt. The resulting command string is passed to `sh -c`.
-
-Example config value:
-```yaml
-planner: "copilot -p \"read and action the instructions in \`<promptFile>\`\" --allow-all-tools --allow-all-paths --autopilot -s"
-```
-
 ## Failure behavior
 
 - Per-arg parse failures: logged `[ERROR]`, item skipped, traversal continues.
 - Per-fetch failures: logged `[ERROR]`, item skipped, traversal continues.
 - Config load failure: logged `[WARN]`, run continues with empty config.
-- Missing planner config: logged `[ERROR]`, process exits non-zero.
-- Planner exits non-zero: exit code logged `[ERROR]` with full command string, process exits non-zero.

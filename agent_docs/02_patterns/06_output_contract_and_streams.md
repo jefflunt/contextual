@@ -6,10 +6,7 @@ Use when changing output formatting, adding metadata, or emitting additional dat
 
 ## stdout
 
-stdout emits **exactly one line**: the path to the output file when the run succeeds.
-
-- Fetch mode: prints path to `context.md` in the current working directory.
-- Plan mode: prints path to `plan.md` in the resolved output directory.
+stdout emits **exactly one line**: the path to the output file `context.md` in the current working directory when the run succeeds.
 
 Do not print anything else to stdout.
 
@@ -96,7 +93,7 @@ Do not mix logs into stdout.
 
 ## Overwrite protection
 
-Before writing `context.md`, `planner.ConfirmOverwrite(path)` is called. If the file already exists, the user is prompted interactively. If they decline, the process prints `Aborted.` to stderr and exits non-zero.
+Before writing `context.md`, `prompt.ConfirmOverwrite(path)` is called. If the file already exists, the user is prompted interactively. If they decline, the process prints `Aborted.` to stderr and exits non-zero.
 
 ## Compatibility guidance
 
