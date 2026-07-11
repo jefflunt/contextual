@@ -58,13 +58,3 @@ contextual -v -p CTX-123 https://example.com/docs/api
 4. **Truncation:** It generates a cleanly formatted `context.md` file in your current directory, automatically truncating the bottom-most (least relevant) content if the total size exceeds your `max_context_length`.
 
 Open the resulting `context.md` file, and you'll see a perfectly formatted Markdown block ready to be passed to your AI agent or LLM interface!
-
-## Usage for AI Agents
-
-`contextual` is designed to be highly scriptable by AI coding agents. Agents can use the `plan` feature to generate an execution plan file based on context:
-
-```bash
-contextual plan CTX-1234
-```
-
-For more deep-dive documentation aimed specifically at AI agents (architecture, patterns), see [`agent_docs/README.md`](agent_docs/README.md).
