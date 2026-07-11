@@ -20,10 +20,10 @@ type ConfluenceResult struct {
 var jiraKeyRe = regexp.MustCompile(`\b[A-Z]+-\d+\b`)
 
 func FetchConfluence(host, email, token, pageID string) (*ConfluenceResult, error) {
-	client := newHTTPClient()
+	client := NewHTTPClient()
 
 	pageURL := fmt.Sprintf("https://%s/wiki/rest/api/content/%s?expand=body.storage,children.page,space,ancestors", host, pageID)
-	data, statusCode, err := doRequest(client, "GET", pageURL, email, token)
+	data, statusCode, err := DoRequest(client, "GET", pageURL, email, token)
 	if err != nil {
 		return nil, err
 	}
@@ -441,4 +441,53 @@ type confluencePageList struct {
 type confluencePageRef struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
+}
+
+// GetConfluenceComments fetches comments for a page.
+func GetConfluenceComments(host, email, token, pageID string) ([]byte, error) {
+	client := NewHTTPClient()
+	url := fmt.Sprintf("https://%s/wiki/rest/api/content/%s/child/comment?expand=body.storage,version,extensions.resolution", host, pageID)
+
+	respData, statusCode, err := DoRequest(client, "GET", url, email, token)
+	if err != nil {
+		return nil, fmt.Errorf("fetching Confluence comments: %w", err)
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, fmt.Errorf("HTTP %d: %s", statusCode, string(respData))
+	}
+	return respData, nil
+}
+
+// SearchConfluencePage searches for a page by title and optional space key, returning its ID.
+func SearchConfluencePage(host, email, token, title, space string) (string, error) {
+	client := NewHTTPClient()
+
+	escapedTitle := strings.ReplaceAll(title, " ", "%20")
+	url := fmt.Sprintf("https://%s/wiki/rest/api/content?title=%s", host, escapedTitle)
+	if space != "" {
+		url += fmt.Sprintf("&spaceKey=%s", space)
+	}
+
+	respData, statusCode, err := DoRequest(client, "GET", url, email, token)
+	if err != nil {
+		return "", fmt.Errorf("searching Confluence page: %w", err)
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return "", fmt.Errorf("HTTP %d: %s", statusCode, string(respData))
+	}
+
+	var searchResp struct {
+		Results []struct {
+			ID string `json:"id"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(respData, &searchResp); err != nil {
+		return "", fmt.Errorf("parsing search response: %w", err)
+	}
+
+	if len(searchResp.Results) == 0 {
+		return "", nil // page not found
+	}
+
+	return searchResp.Results[0].ID, nil
 }

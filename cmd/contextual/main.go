@@ -9,10 +9,12 @@ import (
 	"strings"
 
 	"github.com/jefflunt/contextual/internal/config"
+	"github.com/jefflunt/contextual/internal/fetcher"
 	"github.com/jefflunt/contextual/internal/logger"
 	"github.com/jefflunt/contextual/internal/prompt"
 	"github.com/jefflunt/contextual/internal/spider"
 	"github.com/jefflunt/contextual/internal/types"
+	"github.com/jefflunt/contextual/internal/writer"
 	"github.com/jefflunt/contextual/pkg/version"
 )
 
@@ -22,6 +24,12 @@ func main() {
 	log.SetFlags(0)
 
 	args := os.Args[1:]
+
+	// Detect 'confluence' subcommand.
+	if len(args) > 0 && args[0] == "confluence" {
+		handleConfluenceSubcommand(args[1:])
+		os.Exit(0)
+	}
 
 	// Detect 'version' subcommand.
 	if len(args) > 0 && args[0] == "version" {
@@ -172,6 +180,7 @@ func printHelp() {
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  contextual [--verbose|-v] [--progress|-p] <item> [<item> ...]")
+	fmt.Println("  contextual confluence ... (manage Confluence pages and comments)")
 	fmt.Println("  contextual version")
 	fmt.Println("  contextual help")
 	fmt.Println()
@@ -189,4 +198,160 @@ func itemTypeName(t types.ItemType) string {
 	default:
 		return string(t)
 	}
+}
+
+func handleConfluenceSubcommand(args []string) {
+	if len(args) < 2 {
+		printConfluenceHelp()
+		os.Exit(1)
+	}
+
+	subCmd := args[0]
+	target := args[1]
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+	if cfg.Atlassian.Host == "" || cfg.Atlassian.APIUser == "" || cfg.Atlassian.APIToken == "" {
+		fmt.Fprintln(os.Stderr, "Error: Atlassian credentials (host, api_user, api_token) must be configured in ~/.contextual/config.yml")
+		os.Exit(1)
+	}
+
+	host := cfg.Atlassian.Host
+	email := cfg.Atlassian.APIUser
+	token := cfg.Atlassian.APIToken
+
+	switch {
+	case subCmd == "create" && target == "space":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: contextual confluence create space <space-key> --title <title> [--parent <parent-page-id>] --body-file <file>")
+			os.Exit(1)
+		}
+		spaceKey := args[2]
+
+		fs := flag.NewFlagSet("confluence create space", flag.ExitOnError)
+		title := fs.String("title", "", "Page title")
+		parent := fs.String("parent", "", "Parent page ID (optional)")
+		bodyFile := fs.String("body-file", "", "Path to file containing HTML body")
+		fs.Parse(args[3:])
+
+		if *title == "" || *bodyFile == "" {
+			fmt.Fprintln(os.Stderr, "Error: --title and --body-file are required")
+			os.Exit(1)
+		}
+
+		bodyBytes, err := os.ReadFile(*bodyFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading body file: %v\n", err)
+			os.Exit(1)
+		}
+
+		pageID, err := writer.CreatePage(host, email, token, spaceKey, *title, *parent, string(bodyBytes))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating page: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(pageID)
+
+	case subCmd == "update" && target == "page":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: contextual confluence update page <page-id> --title <title> --body-file <file>")
+			os.Exit(1)
+		}
+		pageID := args[2]
+
+		fs := flag.NewFlagSet("confluence update page", flag.ExitOnError)
+		title := fs.String("title", "", "Page title")
+		bodyFile := fs.String("body-file", "", "Path to file containing HTML body")
+		fs.Parse(args[3:])
+
+		if *title == "" || *bodyFile == "" {
+			fmt.Fprintln(os.Stderr, "Error: --title and --body-file are required")
+			os.Exit(1)
+		}
+
+		bodyBytes, err := os.ReadFile(*bodyFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading body file: %v\n", err)
+			os.Exit(1)
+		}
+
+		err = writer.UpdatePage(host, email, token, pageID, *title, string(bodyBytes))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error updating page: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Successfully updated page %s\n", pageID)
+
+	case subCmd == "search" && target == "page":
+		fs := flag.NewFlagSet("confluence search page", flag.ExitOnError)
+		title := fs.String("title", "", "Page title to search")
+		space := fs.String("space", "", "Space key (optional)")
+		fs.Parse(args[2:])
+
+		if *title == "" {
+			fmt.Fprintln(os.Stderr, "Error: --title is required")
+			os.Exit(1)
+		}
+
+		pageID, err := fetcher.SearchConfluencePage(host, email, token, *title, *space)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error searching page: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(pageID)
+
+	case subCmd == "get" && target == "comments":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: contextual confluence get comments <page-id>")
+			os.Exit(1)
+		}
+		pageID := args[2]
+
+		commentsJSON, err := fetcher.GetConfluenceComments(host, email, token, pageID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting comments: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(commentsJSON))
+
+	case subCmd == "reply" && target == "comment":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: contextual confluence reply comment <comment-id> --page-id <page-id> --body <body>")
+			os.Exit(1)
+		}
+		commentID := args[2]
+
+		fs := flag.NewFlagSet("confluence reply comment", flag.ExitOnError)
+		pageID := fs.String("page-id", "", "Page ID of the comment")
+		body := fs.String("body", "", "Reply message content")
+		fs.Parse(args[3:])
+
+		if *pageID == "" || *body == "" {
+			fmt.Fprintln(os.Stderr, "Error: --page-id and --body are required")
+			os.Exit(1)
+		}
+
+		replyID, err := writer.ReplyToComment(host, email, token, *pageID, commentID, *body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error replying to comment: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(replyID)
+
+	default:
+		printConfluenceHelp()
+		os.Exit(1)
+	}
+}
+
+func printConfluenceHelp() {
+	fmt.Println("Usage:")
+	fmt.Println("  contextual confluence create space <space-key> --title <title> [--parent <parent-page-id>] --body-file <file>")
+	fmt.Println("  contextual confluence update page <page-id> --title <title> --body-file <file>")
+	fmt.Println("  contextual confluence search page --title <title> [--space <space-key>]")
+	fmt.Println("  contextual confluence get comments <page-id>")
+	fmt.Println("  contextual confluence reply comment <comment-id> --page-id <page-id> --body <body>")
 }

@@ -21,10 +21,10 @@ type JiraResult struct {
 }
 
 func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
-	client := newHTTPClient()
+	client := NewHTTPClient()
 
 	issueURL := fmt.Sprintf("https://%s/rest/api/3/issue/%s?expand=fields", host, issueKey)
-	issueData, statusCode, err := doRequest(client, "GET", issueURL, email, token)
+	issueData, statusCode, err := DoRequest(client, "GET", issueURL, email, token)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 
 	// Remote links.
 	remoteURL := fmt.Sprintf("https://%s/rest/api/3/issue/%s/remotelink", host, issueKey)
-	remoteData, remoteStatus, err := doRequest(client, "GET", remoteURL, email, token)
+	remoteData, remoteStatus, err := DoRequest(client, "GET", remoteURL, email, token)
 	if err == nil && remoteStatus >= 200 && remoteStatus < 300 {
 		var remoteLinks []jiraRemoteLink
 		if json.Unmarshal(remoteData, &remoteLinks) == nil {
@@ -102,7 +102,7 @@ func FetchJira(host, email, token, issueKey string) (*JiraResult, error) {
 		// Body for search
 		jsonBody, _ := json.Marshal(map[string]interface{}{"jql": jql, "fields": []string{"key"}})
 
-		data, statusCode, err := doRequestWithBody(client, "POST", searchURL, email, token, jsonBody)
+		data, statusCode, err := DoRequestWithBody(client, "POST", searchURL, email, token, jsonBody)
 		if err == nil && statusCode >= 200 && statusCode < 300 {
 			var searchResp struct {
 				Issues []struct {
@@ -570,11 +570,11 @@ func appendUnique(dst []string, items ...string) []string {
 	return dst
 }
 
-func doRequest(client *http.Client, method, url, email, token string) ([]byte, int, error) {
-	return doRequestWithBody(client, method, url, email, token, nil)
+func DoRequest(client *http.Client, method, url, email, token string) ([]byte, int, error) {
+	return DoRequestWithBody(client, method, url, email, token, nil)
 }
 
-func doRequestWithBody(client *http.Client, method, url, email, token string, body []byte) ([]byte, int, error) {
+func DoRequestWithBody(client *http.Client, method, url, email, token string, body []byte) ([]byte, int, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		bodyReader = bytes.NewReader(body)

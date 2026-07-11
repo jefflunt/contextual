@@ -16,7 +16,7 @@ type WebResult struct {
 }
 
 func FetchWeb(rawURL string) (*WebResult, error) {
-	client := newHTTPClient()
+	client := NewHTTPClient()
 
 	body, finalURL, contentType, statusCode, err := fetchFollowingRedirects(client, rawURL, 5)
 	if err != nil {
@@ -48,7 +48,7 @@ func FetchWeb(rawURL string) (*WebResult, error) {
 	}, nil
 }
 
-func newHTTPClient() *http.Client {
+func NewHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: 30 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
